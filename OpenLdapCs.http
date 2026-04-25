@@ -1,0 +1,6 @@
+@OpenLdapCs_HostAddress = http://localhost:5025
+
+GET {{OpenLdapCs_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
