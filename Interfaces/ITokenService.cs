@@ -4,4 +4,5 @@ public interface ITokenService
 {
     string GenerateAccessToken(string username, string distinguishedName);
     string GenerateRefreshToken();
+    DateTime GetRefreshTokenExpirationUtc();
 }

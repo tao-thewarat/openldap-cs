@@ -9,6 +9,11 @@ public interface ILdapAuthService
         CancellationToken cancellationToken = default
     );
 
+    Task<SigninResponse> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default
+    );
+
     Task<SignupResponse> SignupAsync(
         SignupRequest request,
         CancellationToken cancellationToken = default

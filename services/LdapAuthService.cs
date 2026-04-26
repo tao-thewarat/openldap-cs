@@ -1,16 +1,23 @@
 using OpenLdapCs.DTOs;
 using OpenLdapCs.Interfaces;
+using OpenLdapCs.Models;
 
 namespace OpenLdapCs.Services;
 
 public sealed class LdapAuthService : ILdapAuthService
 {
     private readonly ILdapDirectoryService ldapDirectoryService;
+    private readonly IRefreshTokenStore refreshTokenStore;
     private readonly ITokenService tokenService;
 
-    public LdapAuthService(ILdapDirectoryService ldapDirectoryService, ITokenService tokenService)
+    public LdapAuthService(
+        ILdapDirectoryService ldapDirectoryService,
+        IRefreshTokenStore refreshTokenStore,
+        ITokenService tokenService
+    )
     {
         this.ldapDirectoryService = ldapDirectoryService;
+        this.refreshTokenStore = refreshTokenStore;
         this.tokenService = tokenService;
     }
 
@@ -41,14 +48,82 @@ public sealed class LdapAuthService : ILdapAuthService
             cancellationToken
         );
 
+        if (!isValid)
+        {
+            return new SigninResponse
+            {
+                Success = false,
+                Message = "Invalid username or password.",
+            };
+        }
+
+        var accessToken = tokenService.GenerateAccessToken(request.Username, distinguishedName);
+        var refreshToken = tokenService.GenerateRefreshToken();
+        var refreshTokenExpiresAtUtc = tokenService.GetRefreshTokenExpirationUtc();
+
+        await refreshTokenStore.StoreAsync(
+            refreshToken,
+            new RefreshTokenRecord
+            {
+                Username = request.Username,
+                DistinguishedName = distinguishedName,
+                ExpiresAtUtc = refreshTokenExpiresAtUtc,
+            },
+            refreshTokenExpiresAtUtc - DateTime.UtcNow,
+            cancellationToken
+        );
+
         return new SigninResponse
         {
-            Success = isValid,
-            Message = isValid ? "Signin successful." : "Invalid username or password.",
-            AccessToken = isValid
-                ? tokenService.GenerateAccessToken(request.Username, distinguishedName)
-                : null,
-            RefreshToken = isValid ? tokenService.GenerateRefreshToken() : null,
+            Success = true,
+            Message = "Signin successful.",
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
+        };
+    }
+
+    public async Task<SigninResponse> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var storedToken = await refreshTokenStore.GetAsync(refreshToken, cancellationToken);
+        if (storedToken is null || storedToken.ExpiresAtUtc <= DateTime.UtcNow)
+        {
+            return new SigninResponse
+            {
+                Success = false,
+                Message = "Refresh token is invalid or expired.",
+            };
+        }
+
+        await refreshTokenStore.RemoveAsync(refreshToken, cancellationToken);
+
+        var newAccessToken = tokenService.GenerateAccessToken(
+            storedToken.Username,
+            storedToken.DistinguishedName
+        );
+        var newRefreshToken = tokenService.GenerateRefreshToken();
+        var refreshTokenExpiresAtUtc = tokenService.GetRefreshTokenExpirationUtc();
+
+        await refreshTokenStore.StoreAsync(
+            newRefreshToken,
+            new RefreshTokenRecord
+            {
+                Username = storedToken.Username,
+                DistinguishedName = storedToken.DistinguishedName,
+                ExpiresAtUtc = refreshTokenExpiresAtUtc,
+            },
+            refreshTokenExpiresAtUtc - DateTime.UtcNow,
+            cancellationToken
+        );
+
+        return new SigninResponse
+        {
+            Success = true,
+            Message = "Token refreshed successfully.",
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken,
         };
     }
 

@@ -49,4 +49,9 @@ public sealed class JwtTokenService : ITokenService
         var randomBytes = RandomNumberGenerator.GetBytes(64);
         return Convert.ToBase64String(randomBytes);
     }
+
+    public DateTime GetRefreshTokenExpirationUtc()
+    {
+        return DateTime.UtcNow.AddDays(jwtOptions.RefreshTokenExpirationDays);
+    }
 }

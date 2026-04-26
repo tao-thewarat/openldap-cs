@@ -26,6 +26,12 @@ services:
       - "8081:80"
     depends_on:
       - openldap
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: openldap-redis-local
+    ports:
+      - "6379:6379"
 volumes:
   ldap_data:
   ldap_config:
