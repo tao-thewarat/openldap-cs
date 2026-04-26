@@ -1,92 +1,104 @@
 # OpenLDAP C# Playground
 
-โปรเจกต์นี้เป็นตัวตั้งต้นสำหรับลองต่อ C# Minimal API เข้ากับ OpenLDAP แบบ local
+โปรเจกต์นี้ใช้สำหรับลอง ASP.NET Core Web API คู่กับ OpenLDAP แบบ local ผ่าน Docker
 
 ## สิ่งที่มีให้แล้ว
 
 - `docker-compose.yml` สำหรับรัน OpenLDAP และ phpLDAPadmin
-- LDIF bootstrap สำหรับสร้างข้อมูลตัวอย่างอัตโนมัติ
-- Minimal API สำหรับทดสอบ bind และ search
-- Config LDAP ผ่าน `appsettings.json`
-- Swagger UI สำหรับยิง API ง่าย ๆ
+- LDIF sample สำหรับ import user ตัวอย่าง
+- ค่าตั้งต้น LDAP ใน `appsettings.json`
+- ASP.NET Core Web API พร้อม Swagger
+- pre-commit สำหรับ format, build และ test
 
-## โครงสร้าง
+## เริ่ม OpenLDAP
 
-```text
-.
-├── docker-compose.yml
-├── openldap-cs.sln
-└── src
-    └── OpenLdap.Api
-```
-
-## เริ่มต้นใช้งาน
-
-### 1. ติดตั้ง .NET SDK
-
-แนะนำ .NET 8 SDK
-
-### 2. รัน OpenLDAP
+รันจาก root ของโปรเจกต์:
 
 ```bash
 docker compose up -d
 ```
 
-เปิด phpLDAPadmin ได้ที่ [http://localhost:8081](http://localhost:8081)
+เช็กสถานะ:
 
+```bash
+docker compose ps
+```
+
+ถ้าจะดู log:
+
+```bash
+docker compose logs -f openldap
+docker compose logs -f phpldapadmin
+```
+
+## ค่าเข้าใช้งาน
+
+OpenLDAP:
+
+- Host: `localhost`
+- Port: `389`
+- Base DN: `dc=example,dc=org`
+- Admin DN: `cn=admin,dc=example,dc=org`
+- Admin Password: `admin`
+
+phpLDAPadmin:
+
+- URL: [http://localhost:8081](http://localhost:8081)
 - Login DN: `cn=admin,dc=example,dc=org`
 - Password: `admin`
 
-มี sample user ให้แล้ว:
+ไฟล์ตัวอย่างสำหรับ import:
 
-- User DN: `uid=john,ou=people,dc=example,dc=org`
-- Password: `john123`
+- [docker/ldif/01-bootstrap.ldif](/Users/taotoxicboy/Documents/projects/openldap-cs/docker/ldif/01-bootstrap.ldif)
 
-### 3. restore และรัน API
+## Bind/Search ตัวอย่าง
+
+ถ้ามี `ldapsearch` ในเครื่อง:
+
+```bash
+ldapsearch -x -H ldap://localhost -D "cn=admin,dc=example,dc=org" -w admin -b "dc=example,dc=org"
+```
+
+ถ้าจะ import sample data:
+
+```bash
+docker exec -i openldap-local ldapadd -x -D "cn=admin,dc=example,dc=org" -w admin < docker/ldif/01-bootstrap.ldif
+```
+
+หลัง import แล้วลอง bind ด้วย sample user:
+
+```bash
+ldapwhoami -x -H ldap://localhost -D "uid=john,ou=people,dc=example,dc=org" -w john123
+```
+
+## รัน API
 
 ```bash
 dotnet restore
-dotnet run --project src/OpenLdap.Api
+dotnet watch run
 ```
 
-Swagger จะขึ้นที่ URL ที่ console ของ `dotnet run` แจ้งไว้ เช่น `http://localhost:5047/swagger`
+Swagger ปกติจะอยู่ที่ [http://localhost:5025/swagger](http://localhost:5025/swagger)
 
-## API ที่เตรียมไว้
+## Reset ข้อมูล LDAP
 
-### POST `/ldap/test-bind`
+ถ้าจะล้าง volume แล้วเริ่มใหม่:
 
-ตัวอย่าง request
-
-```json
-{
-  "distinguishedName": "uid=john,ou=people,dc=example,dc=org",
-  "password": "john123"
-}
+```bash
+docker compose down -v
+docker compose up -d
 ```
 
-### GET `/ldap/users`
-
-ค้นหา user แบบง่ายจาก `inetOrgPerson`
+## โครงสร้างที่เกี่ยวข้อง
 
 ```text
-GET /ldap/users
-GET /ldap/users?uid=john
+.
+├── docker-compose.yml
+├── docker/
+│   └── ldif/
+│       └── 01-bootstrap.ldif
+├── Controllers/
+├── DTOs/
+├── Program.cs
+└── appsettings.json
 ```
-
-### POST `/ldap/search`
-
-ค้นหาแบบกำหนด filter เอง
-
-```json
-{
-  "baseDn": "dc=example,dc=org",
-  "filter": "(objectClass=*)",
-  "attributes": ["cn", "uid", "mail"],
-  "sizeLimit": 50
-}
-```
-
-## หมายเหตุ
-
-- ตอนนี้ repo นี้ถูก scaffold ให้พร้อม แต่เครื่องนี้ยังไม่มี `dotnet` ติดตั้ง จึงยังไม่ได้รัน build/test จริง
-- ถ้าจะเพิ่ม seed user สำหรับ LDAP ผมช่วยต่อให้ได้อีก เช่น LDIF sample และ endpoint create user
