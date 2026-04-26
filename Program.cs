@@ -1,9 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using OpenLdapCs.Common.Routing;
+using OpenLdapCs.Interfaces;
+using OpenLdapCs.Options;
+using OpenLdapCs.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+builder.Services.Configure<LdapOptions>(builder.Configuration.GetSection(LdapOptions.SectionName));
+builder.Services.AddScoped<ILdapDirectoryService, LdapDirectoryService>();
+builder.Services.AddScoped<ILdapAuthService, LdapAuthService>();
 
 builder.Services.AddControllers(options =>
 {

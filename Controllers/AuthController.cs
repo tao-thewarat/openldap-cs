@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OpenLdapCs.DTOs;
+using OpenLdapCs.Interfaces;
 
 namespace OpenLdapCs.Controllers;
 
@@ -7,9 +8,30 @@ namespace OpenLdapCs.Controllers;
 [Route("[controller]")]
 public class AuthController : ControllerBase
 {
-    [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginRequest request)
+    private readonly ILdapAuthService ldapAuthService;
+
+    public AuthController(ILdapAuthService ldapAuthService)
     {
-        return Ok(new LoginResponse { Message = "OK" });
+        this.ldapAuthService = ldapAuthService;
+    }
+
+    [HttpPost("signin")]
+    public async Task<IActionResult> Signin(
+        [FromBody] SigninRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var response = await ldapAuthService.SigninAsync(request, cancellationToken);
+        return response.Success ? Ok(response) : Unauthorized(response);
+    }
+
+    [HttpPost("signup")]
+    public async Task<IActionResult> Signup(
+        [FromBody] SignupRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var response = await ldapAuthService.SignupAsync(request, cancellationToken);
+        return response.Success ? Ok(response) : Conflict(response);
     }
 }

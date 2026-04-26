@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OpenLdapCs.DTOs;
 
-public class LoginRequest
+public class SignupRequest
 {
     [Required(ErrorMessage = "Username is required.")]
     public required string Username { get; set; }
