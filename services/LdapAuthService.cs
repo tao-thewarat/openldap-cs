@@ -6,10 +6,12 @@ namespace OpenLdapCs.Services;
 public sealed class LdapAuthService : ILdapAuthService
 {
     private readonly ILdapDirectoryService ldapDirectoryService;
+    private readonly ITokenService tokenService;
 
-    public LdapAuthService(ILdapDirectoryService ldapDirectoryService)
+    public LdapAuthService(ILdapDirectoryService ldapDirectoryService, ITokenService tokenService)
     {
         this.ldapDirectoryService = ldapDirectoryService;
+        this.tokenService = tokenService;
     }
 
     public async Task<SigninResponse> SigninAsync(
@@ -24,7 +26,13 @@ public sealed class LdapAuthService : ILdapAuthService
 
         if (string.IsNullOrWhiteSpace(distinguishedName))
         {
-            return new SigninResponse { Success = false, Message = "User not found." };
+            return new SigninResponse
+            {
+                Success = false,
+                Message = "User not found.",
+                AccessToken = null,
+                RefreshToken = null,
+            };
         }
 
         var isValid = await ldapDirectoryService.ValidateCredentialsAsync(
@@ -37,7 +45,10 @@ public sealed class LdapAuthService : ILdapAuthService
         {
             Success = isValid,
             Message = isValid ? "Signin successful." : "Invalid username or password.",
-            DistinguishedName = isValid ? distinguishedName : null,
+            AccessToken = isValid
+                ? tokenService.GenerateAccessToken(request.Username, distinguishedName)
+                : null,
+            RefreshToken = isValid ? tokenService.GenerateRefreshToken() : null,
         };
     }
 
